@@ -38,7 +38,7 @@
 #include "config.h"
 
 /*number of protected area*/
-#define NB_DATAFLASH_AREA		5
+#define NB_DATAFLASH_AREA		6
 
 #ifdef CFG_NO_FLASH
 

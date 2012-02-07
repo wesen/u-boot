@@ -29,7 +29,7 @@
 #include <environment.h>
 #include <linux/stddef.h>
 #include <malloc.h>
-
+#include <dataflash.h>
 DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_AMIGAONEG3SE
@@ -107,7 +107,7 @@ uchar default_environment[] = {
 	"rootpath="	MK_STR(CONFIG_ROOTPATH)		"\0"
 #endif
 #ifdef	CONFIG_GATEWAYIP
-	"gatewayip="	MK_STR(CONFIG_GATEWAYIP)	"\0"
+	"gatewayip="MK_STR(CONFIG_GATEWAYIP)	"\0"
 #endif
 #ifdef	CONFIG_NETMASK
 	"netmask="	MK_STR(CONFIG_NETMASK)		"\0"
@@ -128,7 +128,20 @@ uchar default_environment[] = {
 	"pcidelay="	MK_STR(CONFIG_PCI_BOOTDELAY)	"\0"
 #endif
 #ifdef  CONFIG_EXTRA_ENV_SETTINGS
-	CONFIG_EXTRA_ENV_SETTINGS
+"Bootstrap_FLASH="  MK_STR(CONFIG_BOOTSTSTART)  "\0"
+"Bootloader_FLASH=" MK_STR(CONFIG_BOOTLDSTART)  "\0"
+"OS_FLASH="			MK_STR(CONFIG_OSSTART)      "\0"
+"FileSystem_FLASH=" MK_STR(CONFIG_FSSTART)      "\0"
+"Bootstrap_END="	MK_STR(CONFIG_BOOTSTEND)    "\0"
+"Bootloader_END="	MK_STR(CONFIG_BOOTLDEND)    "\0"
+"OS_END="			MK_STR(CONFIG_OSEND)        "\0"
+"FileSystem_END="	MK_STR(CONFIG_FSEND)        "\0"
+"Download_SDRAM="	MK_STR(CONFIG_DOWNLOADADDR) "\0"
+"OS_SDRAM="			MK_STR(CONFIG_OS_SDRAM)     "\0"
+"FileSystem_SDRAM=" MK_STR(CONFIG_FS_SDRAM)     "\0"
+"console="			MK_STR(CONFIG_CONSOLE_ENV)	"\0"
+"OS_Size="			MK_STR(CONFIG_MAX_OS_SIZE)	"\0"
+"FileSystem_Size="	MK_STR(CONFIG_MAX_FS_SIZE)	"\0"
 #endif
 	"\0"
 };
@@ -206,25 +219,30 @@ uchar *env_get_addr (int index)
 
 void set_default_env(void)
 {
+	char run_cmd[256];
+	
 	if (sizeof(default_environment) > ENV_SIZE) {
 		puts ("*** Error - default environment is too large\n\n");
 		return;
 	}
 
+
 	memset(env_ptr, 0, sizeof(env_t));
 	memcpy(env_ptr->data, default_environment,
-	       sizeof(default_environment));
+			sizeof(default_environment));
 #ifdef CFG_REDUNDAND_ENVIRONMENT
 	env_ptr->flags = 0xFF;
 #endif
 	env_crc_update ();
 	gd->env_valid = 1;
+	saveenv();
+
 }
 
 void env_relocate (void)
 {
 	DEBUGF ("%s[%d] offset = 0x%lx\n", __FUNCTION__,__LINE__,
-		gd->reloc_off);
+			gd->reloc_off);
 
 #ifdef CONFIG_AMIGAONEG3SE
 	enable_nvram();

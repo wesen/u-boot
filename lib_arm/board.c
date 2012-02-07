@@ -47,6 +47,10 @@
 #include <serial.h>
 #include <nand.h>
 #include <onenand_uboot.h>
+#include <watchdog.h>
+#include <asm/arch/at91sam9260.h>
+#include <asm/arch/at91_watchdog.h>
+#include <asm/arch/io.h>
 
 #ifdef CONFIG_DRIVER_SMC91111
 #include "../drivers/net/smc91111.h"
@@ -255,7 +259,9 @@ init_fnc_t *init_sequence[] = {
 	init_baudrate,		/* initialze baudrate settings */
 	serial_init,		/* serial communications setup */
 	console_init_f,		/* stage 1 init of console */
+#if defined(CONFIG_DISPLAY_BANNER)
 	display_banner,		/* say that we are here */
+#endif
 #if defined(CONFIG_DISPLAY_CPUINFO)
 	print_cpuinfo,		/* display cpu info (and speed) */
 #endif
@@ -266,7 +272,9 @@ init_fnc_t *init_sequence[] = {
 	init_func_i2c,
 #endif
 	dram_init,		/* configure available RAM banks */
+#if defined(CONFIG_DISPLAY_RAM)
 	display_dram_config,
+#endif
 	NULL,
 };
 
@@ -349,7 +357,10 @@ void start_armboot (void)
 
 #ifdef CONFIG_HAS_DATAFLASH
 	AT91F_DataflashInit();
+#ifdef CONFIG_DISPLAY_DATAFLASHINFO
 	dataflash_print_info();
+#endif 
+
 #endif
 
 	/* initialize environment */
@@ -394,6 +405,10 @@ void start_armboot (void)
 		}
 #endif
 	}
+
+	/* Watchdog timer reset */	
+	at91_sys_write(AT91C_WDTC_WDCR, (AT91C_WDTC_WDRSTT | AT91C_WDTC_KEY));
+
 
 	devices_init ();	/* get the devices list going. */
 
@@ -443,16 +458,6 @@ extern void davinci_eth_set_mac_addr (const u_int8_t *addr);
 
 #ifdef BOARD_LATE_INIT
 	board_late_init ();
-#endif
-#if defined(CONFIG_CMD_NET)
-#if defined(CONFIG_NET_MULTI)
-	puts ("Net:   ");
-#endif
-	eth_initialize(gd->bd);
-#if defined(CONFIG_RESET_PHY_R)
-	debug ("Reset Ethernet PHY\n");
-	reset_phy();
-#endif
 #endif
 	/* main_loop() can return to retry autoboot, if so just run it again. */
 	for (;;) {

@@ -379,7 +379,6 @@ int eth_send(volatile void *packet, int length)
 {
 	if (!eth_current)
 		return -1;
-
 	return eth_current->send(eth_current, packet, length);
 }
 

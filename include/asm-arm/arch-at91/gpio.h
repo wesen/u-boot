@@ -363,4 +363,5 @@ static inline int at91_get_gpio_value(unsigned pin)
 	return (pdsr & mask) != 0;
 }
 
+
 #endif

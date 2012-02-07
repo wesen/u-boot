@@ -71,6 +71,7 @@ COBJS-$(CONFIG_CMD_CACHE) += cmd_cache.o
 COBJS-$(CONFIG_CMD_CONSOLE) += cmd_console.o
 COBJS-$(CONFIG_CMD_CPLBINFO) += cmd_cplbinfo.o
 COBJS-$(CONFIG_CMD_DATE) += cmd_date.o
+COBJS-$(CONFIG_CMD_DEFENV) += cmd_defenv.o
 ifdef CONFIG_4xx
 COBJS-$(CONFIG_CMD_SETGETDCR) += cmd_dcr.o
 endif

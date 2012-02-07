@@ -31,6 +31,8 @@
 #include <dataflash.h>
 #endif
 
+int atoi(uchar * string);
+
 #if defined(CONFIG_CMD_JFFS2) && defined(CONFIG_JFFS2_CMDLINE)
 #include <jffs2/jffs2.h>
 
@@ -327,7 +329,7 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 		printf ("Usage:\n%s\n", cmdtp->usage);
 		return 1;
 	}
-
+	
 	if (strcmp(argv[1], "all") == 0) {
 		for (bank=1; bank<=CFG_MAX_FLASH_BANKS; ++bank) {
 			printf ("Erase Flash Bank # %ld ", bank);
@@ -336,7 +338,7 @@ int do_flerase (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 		}
 		return rcode;
 	}
-
+	
 	if ((n = abbrev_spec(argv[1], &info, &sect_first, &sect_last)) != 0) {
 		if (n < 0) {
 			puts ("Bad sector specification\n");
@@ -687,6 +689,203 @@ int flash_sect_protect (int p, ulong addr_first, ulong addr_last)
 }
 #endif /* CFG_NO_FLASH */
 
+int atoi(uchar * string)
+{
+	u8 res = 0;
+	while (*string >= '0' && *string <= '9') {
+		res *= 10;
+		res += *string - '0';
+		string++;
+	}
+
+	return res;
+}
+
+int do_pkginstall (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+{
+	char run_cmd[256];
+	int all_check = 0, cmd_check = 0, rcode = 0, ret = 0;
+	int tmp = 0;
+
+	if (argc < 3) {
+		printf ("Usage:\n%s\n", cmdtp->usage);
+		return 1;
+	}
+
+	if (argc == 3) 
+	{
+		if ( strcmp(argv[1], "bs") == 0) {
+			sprintf(run_cmd, "tftp %s %s", getenv("Download_SDRAM"), argv[2]);
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+
+			sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("Bootstrap_FLASH"), getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+			sprintf(run_cmd, "setenv Bootstrap_Size 0x%s",getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			saveenv();
+
+			cmd_check = 1;
+			return rcode;
+		}
+
+		if ( strcmp(argv[1], "bl") == 0) {
+			sprintf(run_cmd, "tftp %s %s", getenv("Download_SDRAM"), argv[2]);
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+
+			sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("Bootloader_FLASH"), getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+			sprintf(run_cmd, "setenv Bootloader_Size 0x%s",getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			saveenv();
+
+			cmd_check = 1;
+			return rcode;
+		}
+
+		if (strcmp(argv[1], "os") == 0) {
+			sprintf(run_cmd, "tftp %s %s", getenv("Download_SDRAM"), argv[2]);
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+
+			sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("OS_FLASH"), getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+			sprintf(run_cmd, "setenv OS_Size 0x%s",getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			saveenv();
+
+			cmd_check = 1;
+			return rcode;
+		}
+
+		if (strcmp(argv[1], "fs") == 0) {
+			sprintf(run_cmd, "tftp %s %s", getenv("Download_SDRAM"), argv[2]);
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+
+			sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("FileSystem_FLASH"), getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			if (ret == -1 ) return ret;
+			sprintf(run_cmd, "setenv FileSystem_Size 0x%s",getenv("filesize"));
+			ret = run_command(run_cmd, flag);
+			saveenv();
+
+			cmd_check = 1;
+			return rcode;
+		}
+
+	}
+	else if (argc > 3) 
+	{
+		if (strcmp(argv[1], "so") == 0) {
+
+			if (strcmp(argv[2], "0") != 0) 
+			{
+				tmp = atoi(argv[2]);
+
+				if(tmp > 10 && tmp < 100 )
+				{
+
+					sprintf(run_cmd,"192.168.0.%s",argv[2]);
+					setenv("ipaddr",run_cmd);
+					saveenv();
+
+				}
+				else if (tmp < 10 && tmp > 0) 
+				{
+
+					sprintf(run_cmd,"192.168.0.%s",argv[2]);
+					setenv("ipaddr",run_cmd);
+					saveenv();
+				}
+				else 
+				{
+					printf("error ethaddr and ipaddr \n");
+				}
+
+
+			}
+			if (strcmp(argv[3], "0") != 0)
+			{
+				sprintf(run_cmd, "tftp %s eddy-bs-%s.bin", getenv("Download_SDRAM"), argv[3]);
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+
+				sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("Bootstrap_FLASH"), getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+				sprintf(run_cmd, "setenv Bootstrap_Size 0x%s",getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				saveenv();
+
+				cmd_check = 1;
+			}
+
+			if (strcmp(argv[4], "0") != 0)
+			{
+				sprintf(run_cmd, "tftp %s eddy-bl-%s.bin", getenv("Download_SDRAM"), argv[4]);
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+
+				sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("Bootloader_FLASH"), getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+				sprintf(run_cmd, "setenv Bootloader_Size 0x%s",getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				saveenv();
+
+				cmd_check = 1;
+			}
+
+			if (strcmp(argv[5], "0") != 0)
+			{
+				sprintf(run_cmd, "tftp %s eddy-os-%s.bin", getenv("Download_SDRAM"), argv[5]);
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+
+				sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("OS_FLASH"), getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+				sprintf(run_cmd, "setenv OS_Size 0x%s",getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				saveenv();
+
+				cmd_check = 1;
+			}
+
+			if (strcmp(argv[6], "0") != 0)
+			{
+				sprintf(run_cmd, "tftp %s eddy-fs-%s.bin", getenv("Download_SDRAM"), argv[6]);
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+
+				sprintf(run_cmd, "cp.b %s %s %s", getenv("Download_SDRAM"), getenv("FileSystem_FLASH"), getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				if (ret == -1 ) return ret;
+				sprintf(run_cmd, "setenv FileSystem_Size 0x%s",getenv("filesize"));
+				ret = run_command(run_cmd, flag);
+				saveenv();
+
+				cmd_check = 1;
+			}
+			return rcode;
+
+		}
+
+	}
+
+
+	if (cmd_check != 1) {
+		printf ("Usage:\n%s\n", cmdtp->usage);
+		return 1;
+	}
+
+	return rcode;
+}
 
 /**************************************************/
 #if defined(CONFIG_CMD_JFFS2) && defined(CONFIG_JFFS2_CMDLINE)
@@ -700,50 +899,61 @@ int flash_sect_protect (int p, ulong addr_first, ulong addr_last)
 #endif
 
 U_BOOT_CMD(
-	flinfo,    2,    1,    do_flinfo,
-	"flinfo  - print FLASH memory information\n",
-	"\n    - print information for all FLASH memory banks\n"
-	"flinfo N\n    - print information for FLASH memory bank # N\n"
+		flinfo,    2,    1,    do_flinfo,
+		"flinfo  - print FLASH memory information\n",
+		"\n    - print information for all FLASH memory banks\n"
+		"flinfo N\n    - print information for FLASH memory bank # N\n"
+		);
+
+U_BOOT_CMD(
+		erase,   3,   0,  do_flerase,
+		"erase   - erase FLASH memory\n",
+		"start end\n"
+		"    - erase FLASH from addr 'start' to addr 'end'\n"
+		"erase start +len\n"
+		"    - erase FLASH from addr 'start' to the end of sect "
+		"w/addr 'start'+'len'-1\n"
+		"erase N:SF[-SL]\n    - erase sectors SF-SL in FLASH bank # N\n"
+		"erase bank N\n    - erase FLASH bank # N\n"
+		TMP_ERASE
+		"erase all\n    - erase all FLASH banks\n"
+		);
+
+U_BOOT_CMD(
+		protect,  4,  0,   do_protect,
+		"protect - enable or disable FLASH write protection\n",
+		"on  start end\n"
+		"    - protect FLASH from addr 'start' to addr 'end'\n"
+		"protect on start +len\n"
+		"    - protect FLASH from addr 'start' to end of sect "
+		"w/addr 'start'+'len'-1\n"
+		"protect on  N:SF[-SL]\n"
+		"    - protect sectors SF-SL in FLASH bank # N\n"
+		"protect on  bank N\n    - protect FLASH bank # N\n"
+		TMP_PROT_ON
+		"protect on  all\n    - protect all FLASH banks\n"
+		"protect off start end\n"
+		"    - make FLASH from addr 'start' to addr 'end' writable\n"
+		"protect off start +len\n"
+		"    - make FLASH from addr 'start' to end of sect "
+		"w/addr 'start'+'len'-1 wrtable\n"
+		"protect off N:SF[-SL]\n"
+		"    - make sectors SF-SL writable in FLASH bank # N\n"
+		"protect off bank N\n    - make FLASH bank # N writable\n"
+TMP_PROT_OFF
+"protect off all\n    - make all FLASH banks writable\n"
 );
 
 U_BOOT_CMD(
-	erase,   3,   0,  do_flerase,
-	"erase   - erase FLASH memory\n",
-	"start end\n"
-	"    - erase FLASH from addr 'start' to addr 'end'\n"
-	"erase start +len\n"
-	"    - erase FLASH from addr 'start' to the end of sect "
-	"w/addr 'start'+'len'-1\n"
-	"erase N:SF[-SL]\n    - erase sectors SF-SL in FLASH bank # N\n"
-	"erase bank N\n    - erase FLASH bank # N\n"
-	TMP_ERASE
-	"erase all\n    - erase all FLASH banks\n"
-);
-
-U_BOOT_CMD(
-	protect,  4,  0,   do_protect,
-	"protect - enable or disable FLASH write protection\n",
-	"on  start end\n"
-	"    - protect FLASH from addr 'start' to addr 'end'\n"
-	"protect on start +len\n"
-	"    - protect FLASH from addr 'start' to end of sect "
-	"w/addr 'start'+'len'-1\n"
-	"protect on  N:SF[-SL]\n"
-	"    - protect sectors SF-SL in FLASH bank # N\n"
-	"protect on  bank N\n    - protect FLASH bank # N\n"
-	TMP_PROT_ON
-	"protect on  all\n    - protect all FLASH banks\n"
-	"protect off start end\n"
-	"    - make FLASH from addr 'start' to addr 'end' writable\n"
-	"protect off start +len\n"
-	"    - make FLASH from addr 'start' to end of sect "
-	"w/addr 'start'+'len'-1 wrtable\n"
-	"protect off N:SF[-SL]\n"
-	"    - make sectors SF-SL writable in FLASH bank # N\n"
-	"protect off bank N\n    - make FLASH bank # N writable\n"
-	TMP_PROT_OFF
-	"protect off all\n    - make all FLASH banks writable\n"
-);
+		install,    8,    1,    do_pkginstall,
+		"install - package install for FLASH memory\n",
+		"\n    - package install for FLASH memory(Bootstrap, Bootloader, OS, FileSystem, Config)\n"
+		"install bs <bootstrap image name>\n    - bootstrap package install for FLASH memory\n"
+		"install bl <bootloader image name>\n    - bootldr package install for FLASH memory\n"
+		"install os <kernel image name>\n    - os package install for FLASH memorya\n"
+		"install fs <file system image name>\n    - filesystem package install for FLASH memory\n"
+		"install so\n    - some package install for FLASH memory(Bootstrap, Bootloader, OS, FileSystem, Config)\n"
+		);
 
 #undef	TMP_ERASE
 #undef	TMP_PROT_ON

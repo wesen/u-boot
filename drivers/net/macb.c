@@ -56,7 +56,7 @@
 #define CFG_MACB_RX_RING_SIZE		(CFG_MACB_RX_BUFFER_SIZE / 128)
 #define CFG_MACB_TX_RING_SIZE		16
 #define CFG_MACB_TX_TIMEOUT		1000
-#define CFG_MACB_AUTONEG_TIMEOUT	5000000
+#define CFG_MACB_AUTONEG_TIMEOUT	50000
 
 struct macb_dma_desc {
 	u32	addr;
@@ -209,6 +209,7 @@ static int macb_send(struct eth_device *netdev, volatile void *packet,
 		if (ctrl & TXBUF_EXHAUSTED)
 			printf("%s: TX buffers exhausted in mid frame\n",
 			       netdev->name);
+		
 	} else {
 		printf("%s: TX timeout\n", netdev->name);
 	}
@@ -249,8 +250,11 @@ static int macb_recv(struct eth_device *netdev)
 	u32 status;
 
 	for (;;) {
-		if (!(macb->rx_ring[rx_tail].addr & RXADDR_USED))
+		if (!(macb->rx_ring[rx_tail].addr & RXADDR_USED))	
+		{
 			return -1;
+		}
+			
 
 		status = macb->rx_ring[rx_tail].ctrl;
 		if (status & RXBUF_FRAME_START) {
@@ -299,7 +303,6 @@ static void macb_phy_reset(struct macb_device *macb)
 
 	adv = ADVERTISE_CSMA | ADVERTISE_ALL;
 	macb_mdio_write(macb, MII_ADVERTISE, adv);
-	printf("%s: Starting autonegotiation...\n", netdev->name);
 	macb_mdio_write(macb, MII_BMCR, (BMCR_ANENABLE
 					 | BMCR_ANRESTART));
 
@@ -333,6 +336,7 @@ static int macb_phy_init(struct macb_device *macb)
 	}
 
 	status = macb_mdio_read(macb, MII_BMSR);
+	
 	if (!(status & BMSR_LSTATUS)) {
 		/* Try to re-negotiate if we don't have link already. */
 		macb_phy_reset(macb);
@@ -346,8 +350,6 @@ static int macb_phy_init(struct macb_device *macb)
 	}
 
 	if (!(status & BMSR_LSTATUS)) {
-		printf("%s: link down (status: 0x%04x)\n",
-		       netdev->name, status);
 		return 0;
 	} else {
 		adv = macb_mdio_read(macb, MII_ADVERTISE);
@@ -496,6 +498,7 @@ int macb_eth_initialize(int id, void *regs, unsigned int phy_addr)
 	 * to the PHY
 	 */
 	macb_hz = get_macb_pclk_rate(id);
+
 	if (macb_hz < 20000000)
 		ncfgr = MACB_BF(CLK, MACB_CLK_DIV8);
 	else if (macb_hz < 40000000)

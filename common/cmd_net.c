@@ -242,6 +242,7 @@ netboot_common (proto_t proto, cmd_tbl_t *cmdtp, int argc, char *argv[])
 #if defined(CONFIG_CMD_PING)
 int do_ping (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 {
+	int ret = 0;
 	if (argc < 2)
 		return -1;
 
@@ -250,8 +251,8 @@ int do_ping (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 		printf ("Usage:\n%s\n", cmdtp->usage);
 		return -1;
 	}
-
-	if (NetLoop(PING) < 0) {
+	ret = NetLoop (PING);
+	if (ret) {
 		printf("ping failed; host %s is not alive\n", argv[1]);
 		return 1;
 	}

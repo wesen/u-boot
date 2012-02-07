@@ -29,6 +29,10 @@ struct dataflash_addr cs[CFG_MAX_DATAFLASH_BANKS] = {
 	{CFG_DATAFLASH_LOGIC_ADDR_CS0, 0},	/* Logical adress, CS */
 	{CFG_DATAFLASH_LOGIC_ADDR_CS1, 1}
 };
+/*
+ * shlee change 2008 11 24
+ */
+#if 0
 
 /*define the area offsets*/
 dataflash_protect_t area_list[NB_DATAFLASH_AREA] = {
@@ -37,4 +41,15 @@ dataflash_protect_t area_list[NB_DATAFLASH_AREA] = {
 	{0x00008400, 0x00041FFF, FLAG_PROTECT_SET,   0, "U-Boot"},
 	{0x00042000, 0x00251FFF, FLAG_PROTECT_CLEAR, 0,	"Kernel"},
 	{0x00252000, 0xFFFFFFFF, FLAG_PROTECT_CLEAR, 0,	"FS"},
+};
+#endif
+
+/*define the area offsets*/
+dataflash_protect_t area_list[NB_DATAFLASH_AREA] = {
+	{0x00000000, 0x00001FFF, FLAG_PROTECT_CLEAR, 0, "Bootstrap"},
+	{0x00002000, 0x00002FFF, FLAG_PROTECT_CLEAR, 0, "Environment"},
+	{0x00003000, 0x0003FFFF, FLAG_PROTECT_CLEAR, 0, "U-Boot"},
+	{0x00040000, 0x0027FFFF, FLAG_PROTECT_CLEAR, 0,	"Kernel"},
+	{0x00280000, 0x006FFFFF, FLAG_PROTECT_CLEAR, 0,	"FS"},
+	{0x00700000, 0x007FFFFF, FLAG_PROTECT_CLEAR, 0,	"CF"},
 };

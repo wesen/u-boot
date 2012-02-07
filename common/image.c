@@ -66,7 +66,7 @@ extern int do_bdinfo(cmd_tbl_t *cmdtp, int flag, int argc, char *argv[]);
 DECLARE_GLOBAL_DATA_PTR;
 
 static image_header_t* image_get_ramdisk (ulong rd_addr, uint8_t arch,
-						int verify);
+		int verify);
 #else
 #include "mkimage.h"
 #include <u-boot/md5.h>
@@ -237,7 +237,7 @@ ulong image_multi_count (image_header_t *hdr)
  *     0 in data and len, if idx is out of range
  */
 void image_multi_getimg (image_header_t *hdr, ulong idx,
-			ulong *data, ulong *len)
+		ulong *data, ulong *len)
 {
 	int i;
 	uint32_t *size;
@@ -364,10 +364,10 @@ void image_print_contents (image_header_t *hdr)
  *     otherwise, return NULL
  */
 static image_header_t* image_get_ramdisk (ulong rd_addr, uint8_t arch,
-						int verify)
+		int verify)
 {
 	image_header_t *rd_hdr = (image_header_t *)rd_addr;
-
+#if 0
 	if (!image_check_magic (rd_hdr)) {
 		puts ("Bad Magic Number\n");
 		show_boot_progress (-10);
@@ -394,15 +394,15 @@ static image_header_t* image_get_ramdisk (ulong rd_addr, uint8_t arch,
 	}
 
 	show_boot_progress (11);
-
 	if (!image_check_os (rd_hdr, IH_OS_LINUX) ||
-	    !image_check_arch (rd_hdr, arch) ||
-	    !image_check_type (rd_hdr, IH_TYPE_RAMDISK)) {
+			!image_check_arch (rd_hdr, arch) ||
+			!image_check_type (rd_hdr, IH_TYPE_RAMDISK)) {
 		printf ("No Linux %s Ramdisk Image\n",
 				genimg_get_arch_name(arch));
 		show_boot_progress (-13);
 		return NULL;
 	}
+#endif 
 
 	return rd_hdr;
 }
@@ -674,33 +674,33 @@ ulong genimg_get_image (ulong img_addr)
 
 		/* read in header */
 		debug ("   Reading image header from dataflash address "
-			"%08lx to RAM address %08lx\n", img_addr, ram_addr);
+				"%08lx to RAM address %08lx\n", img_addr, ram_addr);
 
 		read_dataflash (img_addr, h_size, (char *)ram_addr);
 
 		/* get data size */
 		switch (genimg_get_format ((void *)ram_addr)) {
-		case IMAGE_FORMAT_LEGACY:
-			d_size = image_get_data_size ((image_header_t *)ram_addr);
-			debug ("   Legacy format image found at 0x%08lx, size 0x%08lx\n",
-					ram_addr, d_size);
-			break;
+			case IMAGE_FORMAT_LEGACY:
+				d_size = image_get_data_size ((image_header_t *)ram_addr);
+				debug ("   Legacy format image found at 0x%08lx, size 0x%08lx\n",
+						ram_addr, d_size);
+				break;
 #if defined(CONFIG_FIT)
-		case IMAGE_FORMAT_FIT:
-			d_size = fit_get_size ((const void *)ram_addr) - h_size;
-			debug ("   FIT/FDT format image found at 0x%08lx, size 0x%08lx\n",
-					ram_addr, d_size);
-			break;
+			case IMAGE_FORMAT_FIT:
+				d_size = fit_get_size ((const void *)ram_addr) - h_size;
+				debug ("   FIT/FDT format image found at 0x%08lx, size 0x%08lx\n",
+						ram_addr, d_size);
+				break;
 #endif
-		default:
-			printf ("   No valid image found at 0x%08lx\n", img_addr);
-			return ram_addr;
+			default:
+				printf ("   No valid image found at 0x%08lx\n", img_addr);
+				return ram_addr;
 		}
 
 		/* read in image data */
 		debug ("   Reading image remaining data from dataflash address "
-			"%08lx to RAM address %08lx\n", img_addr + h_size,
-			ram_addr + h_size);
+				"%08lx to RAM address %08lx\n", img_addr + h_size,
+				ram_addr + h_size);
 
 		read_dataflash (img_addr + h_size, d_size,
 				(char *)(ram_addr + h_size));
@@ -758,21 +758,12 @@ int boot_get_ramdisk (int argc, char *argv[], bootm_headers_t *images,
 {
 	ulong rd_addr, rd_load;
 	ulong rd_data, rd_len;
+	ulong fs_size;
 	image_header_t *rd_hdr;
-#if defined(CONFIG_FIT)
-	void		*fit_hdr;
-	const char	*fit_uname_config = NULL;
-	const char	*fit_uname_ramdisk = NULL;
-	ulong		default_addr;
-	int		rd_noffset;
-	int		cfg_noffset;
-	const void	*data;
-	size_t		size;
-#endif
+	char run_cmd[256];
 
 	*rd_start = 0;
 	*rd_end = 0;
-
 	/*
 	 * Look for a '-' which indicates to ignore the
 	 * ramdisk argument
@@ -781,62 +772,11 @@ int boot_get_ramdisk (int argc, char *argv[], bootm_headers_t *images,
 		debug ("## Skipping init Ramdisk\n");
 		rd_len = rd_data = 0;
 	} else if (argc >= 3 || genimg_has_config (images)) {
-#if defined(CONFIG_FIT)
-		if (argc >= 3) {
-			/*
-			 * If the init ramdisk comes from the FIT image and
-			 * the FIT image address is omitted in the command
-			 * line argument, try to use os FIT image address or
-			 * default load address.
-			 */
-			if (images->fit_uname_os)
-				default_addr = (ulong)images->fit_hdr_os;
-			else
-				default_addr = load_addr;
-
-			if (fit_parse_conf (argv[2], default_addr,
-						&rd_addr, &fit_uname_config)) {
-				debug ("*  ramdisk: config '%s' from image at 0x%08lx\n",
-						fit_uname_config, rd_addr);
-			} else if (fit_parse_subimage (argv[2], default_addr,
-						&rd_addr, &fit_uname_ramdisk)) {
-				debug ("*  ramdisk: subimage '%s' from image at 0x%08lx\n",
-						fit_uname_ramdisk, rd_addr);
-			} else
-#endif
-			{
-				rd_addr = simple_strtoul(argv[2], NULL, 16);
-				debug ("*  ramdisk: cmdline image address = 0x%08lx\n",
-						rd_addr);
-			}
-#if defined(CONFIG_FIT)
-		} else {
-			/* use FIT configuration provided in first bootm
-			 * command argument
-			 */
-			rd_addr = (ulong)images->fit_hdr_os;
-			fit_uname_config = images->fit_uname_cfg;
-			debug ("*  ramdisk: using config '%s' from image at 0x%08lx\n",
-					fit_uname_config, rd_addr);
-
-			/*
-			 * Check whether configuration has ramdisk defined,
-			 * if not, don't try to use it, quit silently.
-			 */
-			fit_hdr = (void *)rd_addr;
-			cfg_noffset = fit_conf_get_node (fit_hdr, fit_uname_config);
-			if (cfg_noffset < 0) {
-				debug ("*  ramdisk: no such config\n");
-				return 1;
-			}
-
-			rd_noffset = fit_conf_get_ramdisk_node (fit_hdr, cfg_noffset);
-			if (rd_noffset < 0) {
-				debug ("*  ramdisk: no ramdisk in config\n");
-				return 0;
-			}
+		{
+			rd_addr = simple_strtoul(argv[2], NULL, 16);
+			debug ("*  ramdisk: cmdline image address = 0x%08lx\n",
+					rd_addr);
 		}
-#endif
 
 		/* copy from dataflash if needed */
 		rd_addr = genimg_get_image (rd_addr);
@@ -847,97 +787,38 @@ int boot_get_ramdisk (int argc, char *argv[], bootm_headers_t *images,
 		 * check image type, for FIT images get FIT node.
 		 */
 		switch (genimg_get_format ((void *)rd_addr)) {
-		case IMAGE_FORMAT_LEGACY:
-			printf ("## Loading init Ramdisk from Legacy "
-					"Image at %08lx ...\n", rd_addr);
+			case IMAGE_FORMAT_LEGACY:
+				debug ("## Loading init Ramdisk from Legacy "
+						"Image at %08lx ...\n", rd_addr);
 
-			show_boot_progress (9);
-			rd_hdr = image_get_ramdisk (rd_addr, arch,
-							images->verify);
+				show_boot_progress (9);
+				rd_hdr = image_get_ramdisk (rd_addr, arch,
+						images->verify);
 
-			if (rd_hdr == NULL)
-				return 1;
-
-			rd_data = image_get_data (rd_hdr);
-			rd_len = image_get_data_size (rd_hdr);
-			rd_load = image_get_load (rd_hdr);
-			break;
-#if defined(CONFIG_FIT)
-		case IMAGE_FORMAT_FIT:
-			fit_hdr = (void *)rd_addr;
-			printf ("## Loading init Ramdisk from FIT "
-					"Image at %08lx ...\n", rd_addr);
-
-			show_boot_progress (120);
-			if (!fit_check_format (fit_hdr)) {
-				puts ("Bad FIT ramdisk image format!\n");
-				show_boot_progress (-120);
-				return 1;
-			}
-			show_boot_progress (121);
-
-			if (!fit_uname_ramdisk) {
-				/*
-				 * no ramdisk image node unit name, try to get config
-				 * node first. If config unit node name is NULL
-				 * fit_conf_get_node() will try to find default config node
-				 */
-				show_boot_progress (122);
-				cfg_noffset = fit_conf_get_node (fit_hdr, fit_uname_config);
-				if (cfg_noffset < 0) {
-					puts ("Could not find configuration node\n");
-					show_boot_progress (-122);
+				if (rd_hdr == NULL)
 					return 1;
-				}
-				fit_uname_config = fdt_get_name (fit_hdr, cfg_noffset, NULL);
-				printf ("   Using '%s' configuration\n", fit_uname_config);
 
-				rd_noffset = fit_conf_get_ramdisk_node (fit_hdr, cfg_noffset);
-				fit_uname_ramdisk = fit_get_name (fit_hdr, rd_noffset, NULL);
-			} else {
-				/* get ramdisk component image node offset */
-				show_boot_progress (123);
-				rd_noffset = fit_image_get_node (fit_hdr, fit_uname_ramdisk);
-			}
-			if (rd_noffset < 0) {
-				puts ("Could not find subimage node\n");
-				show_boot_progress (-124);
+				rd_data = image_get_data (rd_hdr);
+				rd_len = image_get_data_size (rd_hdr);
+				rd_load = image_get_load (rd_hdr);
+			
+				/* 
+				 * 	shlee 9912
+			 	 *  image_get_data_size return the filesystem image size without the header(0x40) 
+			 	 *  so added that size below.
+			 	 */
+
+				fs_size = rd_len + 0x80;
+				sprintf(run_cmd, "setenv FileSystem_Size 0x%x",fs_size);
+				run_command(run_cmd, 0);
+				saveenv();
+
+				debug("\n\n boot_get_ramdisk  no.2 rd_data(%d),rd_len(%d),rd_load(%d)\n",rd_data,rd_len,rd_load);
+				break;
+			default:
+				puts ("Wrong Ramdisk Image Format\n");
+				rd_data = rd_len = rd_load = 0;
 				return 1;
-			}
-
-			printf ("   Trying '%s' ramdisk subimage\n", fit_uname_ramdisk);
-
-			show_boot_progress (125);
-			if (!fit_check_ramdisk (fit_hdr, rd_noffset, arch, images->verify))
-				return 1;
-
-			/* get ramdisk image data address and length */
-			if (fit_image_get_data (fit_hdr, rd_noffset, &data, &size)) {
-				puts ("Could not find ramdisk subimage data!\n");
-				show_boot_progress (-127);
-				return 1;
-			}
-			show_boot_progress (128);
-
-			rd_data = (ulong)data;
-			rd_len = size;
-
-			if (fit_image_get_load (fit_hdr, rd_noffset, &rd_load)) {
-				puts ("Can't get ramdisk subimage load address!\n");
-				show_boot_progress (-129);
-				return 1;
-			}
-			show_boot_progress (129);
-
-			images->fit_hdr_rd = fit_hdr;
-			images->fit_uname_rd = fit_uname_ramdisk;
-			images->fit_noffset_rd = rd_noffset;
-			break;
-#endif
-		default:
-			puts ("Wrong Ramdisk Image Format\n");
-			rd_data = rd_len = rd_load = 0;
-			return 1;
 		}
 
 #if defined(CONFIG_B2) || defined(CONFIG_EVB4510) || defined(CONFIG_ARMADILLO)
@@ -1005,7 +886,7 @@ int boot_get_ramdisk (int argc, char *argv[], bootm_headers_t *images,
  *     -1 - failure
  */
 int boot_ramdisk_high (struct lmb *lmb, ulong rd_data, ulong rd_len,
-		  ulong *initrd_start, ulong *initrd_end)
+		ulong *initrd_start, ulong *initrd_end)
 {
 	char	*s;
 	ulong	initrd_high;
@@ -1223,11 +1104,11 @@ int boot_relocate_fdt (struct lmb *lmb, ulong bootmap_base,
 		}
 
 		debug ("## device tree at 0x%08lX ... 0x%08lX (len=%ld=0x%lX)\n",
-			(ulong)fdt_blob, (ulong)fdt_blob + *of_size - 1,
-			of_len, of_len);
+				(ulong)fdt_blob, (ulong)fdt_blob + *of_size - 1,
+				of_len, of_len);
 
 		printf ("   Loading Device Tree to %08lx, end %08lx ... ",
-			of_start, of_start + of_len - 1);
+				of_start, of_start + of_len - 1);
 
 		err = fdt_open_into (fdt_blob, (void *)of_start, of_len);
 		if (err != 0) {
@@ -1323,11 +1204,11 @@ int boot_get_fdt (int flag, int argc, char *argv[], bootm_headers_t *images,
 						fit_uname_fdt, fdt_addr);
 			} else
 #endif
-			{
-				fdt_addr = simple_strtoul(argv[3], NULL, 16);
-				debug ("*  fdt: cmdline image address = 0x%08lx\n",
-						fdt_addr);
-			}
+						{
+							fdt_addr = simple_strtoul(argv[3], NULL, 16);
+							debug ("*  fdt: cmdline image address = 0x%08lx\n",
+									fdt_addr);
+						}
 #if defined(CONFIG_FIT)
 		} else {
 			/* use FIT configuration provided in first bootm
@@ -1371,155 +1252,155 @@ int boot_get_fdt (int flag, int argc, char *argv[], bootm_headers_t *images,
 		 * check image type, for FIT images get a FIT node.
 		 */
 		switch (genimg_get_format ((void *)fdt_addr)) {
-		case IMAGE_FORMAT_LEGACY:
-			/* verify fdt_addr points to a valid image header */
-			printf ("## Flattened Device Tree from Legacy Image at %08lx\n",
-					fdt_addr);
-			fdt_hdr = image_get_fdt (fdt_addr);
-			if (!fdt_hdr)
-				goto error;
-
-			/*
-			 * move image data to the load address,
-			 * make sure we don't overwrite initial image
-			 */
-			image_start = (ulong)fdt_hdr;
-			image_end = image_get_image_end (fdt_hdr);
-
-			load_start = image_get_load (fdt_hdr);
-			load_end = load_start + image_get_data_size (fdt_hdr);
-
-			if ((load_start < image_end) && (load_end > image_start)) {
-				fdt_error ("fdt overwritten");
-				goto error;
-			}
-
-			debug ("   Loading FDT from 0x%08lx to 0x%08lx\n",
-					image_get_data (fdt_hdr), load_start);
-
-			memmove ((void *)load_start,
-					(void *)image_get_data (fdt_hdr),
-					image_get_data_size (fdt_hdr));
-
-			fdt_blob = (char *)load_start;
-			break;
-		case IMAGE_FORMAT_FIT:
-			/*
-			 * This case will catch both: new uImage format
-			 * (libfdt based) and raw FDT blob (also libfdt
-			 * based).
-			 */
-#if defined(CONFIG_FIT)
-			/* check FDT blob vs FIT blob */
-			if (fit_check_format ((const void *)fdt_addr)) {
-				/*
-				 * FIT image
-				 */
-				fit_hdr = (void *)fdt_addr;
-				printf ("## Flattened Device Tree from FIT Image at %08lx\n",
+			case IMAGE_FORMAT_LEGACY:
+				/* verify fdt_addr points to a valid image header */
+				printf ("## Flattened Device Tree from Legacy Image at %08lx\n",
 						fdt_addr);
-
-				if (!fit_uname_fdt) {
-					/*
-					 * no FDT blob image node unit name,
-					 * try to get config node first. If
-					 * config unit node name is NULL
-					 * fit_conf_get_node() will try to
-					 * find default config node
-					 */
-					cfg_noffset = fit_conf_get_node (fit_hdr,
-							fit_uname_config);
-
-					if (cfg_noffset < 0) {
-						fdt_error ("Could not find configuration node\n");
-						goto error;
-					}
-
-					fit_uname_config = fdt_get_name (fit_hdr,
-							cfg_noffset, NULL);
-					printf ("   Using '%s' configuration\n",
-							fit_uname_config);
-
-					fdt_noffset = fit_conf_get_fdt_node (fit_hdr,
-							cfg_noffset);
-					fit_uname_fdt = fit_get_name (fit_hdr,
-							fdt_noffset, NULL);
-				} else {
-					/* get FDT component image node offset */
-					fdt_noffset = fit_image_get_node (fit_hdr,
-							fit_uname_fdt);
-				}
-				if (fdt_noffset < 0) {
-					fdt_error ("Could not find subimage node\n");
+				fdt_hdr = image_get_fdt (fdt_addr);
+				if (!fdt_hdr)
 					goto error;
-				}
-
-				printf ("   Trying '%s' FDT blob subimage\n",
-						fit_uname_fdt);
-
-				if (!fit_check_fdt (fit_hdr, fdt_noffset,
-							images->verify))
-					goto error;
-
-				/* get ramdisk image data address and length */
-				if (fit_image_get_data (fit_hdr, fdt_noffset,
-							&data, &size)) {
-					fdt_error ("Could not find FDT subimage data");
-					goto error;
-				}
-
-				/* verift that image data is a proper FDT blob */
-				if (fdt_check_header ((char *)data) != 0) {
-					fdt_error ("Subimage data is not a FTD");
-					goto error;
-				}
 
 				/*
 				 * move image data to the load address,
 				 * make sure we don't overwrite initial image
 				 */
-				image_start = (ulong)fit_hdr;
-				image_end = fit_get_end (fit_hdr);
+				image_start = (ulong)fdt_hdr;
+				image_end = image_get_image_end (fdt_hdr);
 
-				if (fit_image_get_load (fit_hdr, fdt_noffset,
-							&load_start) == 0) {
-					load_end = load_start + size;
+				load_start = image_get_load (fdt_hdr);
+				load_end = load_start + image_get_data_size (fdt_hdr);
 
-					if ((load_start < image_end) &&
-							(load_end > image_start)) {
-						fdt_error ("FDT overwritten");
+				if ((load_start < image_end) && (load_end > image_start)) {
+					fdt_error ("fdt overwritten");
+					goto error;
+				}
+
+				debug ("   Loading FDT from 0x%08lx to 0x%08lx\n",
+						image_get_data (fdt_hdr), load_start);
+
+				memmove ((void *)load_start,
+						(void *)image_get_data (fdt_hdr),
+						image_get_data_size (fdt_hdr));
+
+				fdt_blob = (char *)load_start;
+				break;
+			case IMAGE_FORMAT_FIT:
+				/*
+				 * This case will catch both: new uImage format
+				 * (libfdt based) and raw FDT blob (also libfdt
+				 * based).
+				 */
+#if defined(CONFIG_FIT)
+				/* check FDT blob vs FIT blob */
+				if (fit_check_format ((const void *)fdt_addr)) {
+					/*
+					 * FIT image
+					 */
+					fit_hdr = (void *)fdt_addr;
+					printf ("## Flattened Device Tree from FIT Image at %08lx\n",
+							fdt_addr);
+
+					if (!fit_uname_fdt) {
+						/*
+						 * no FDT blob image node unit name,
+						 * try to get config node first. If
+						 * config unit node name is NULL
+						 * fit_conf_get_node() will try to
+						 * find default config node
+						 */
+						cfg_noffset = fit_conf_get_node (fit_hdr,
+								fit_uname_config);
+
+						if (cfg_noffset < 0) {
+							fdt_error ("Could not find configuration node\n");
+							goto error;
+						}
+
+						fit_uname_config = fdt_get_name (fit_hdr,
+								cfg_noffset, NULL);
+						printf ("   Using '%s' configuration\n",
+								fit_uname_config);
+
+						fdt_noffset = fit_conf_get_fdt_node (fit_hdr,
+								cfg_noffset);
+						fit_uname_fdt = fit_get_name (fit_hdr,
+								fdt_noffset, NULL);
+					} else {
+						/* get FDT component image node offset */
+						fdt_noffset = fit_image_get_node (fit_hdr,
+								fit_uname_fdt);
+					}
+					if (fdt_noffset < 0) {
+						fdt_error ("Could not find subimage node\n");
 						goto error;
 					}
 
-					printf ("   Loading FDT from 0x%08lx to 0x%08lx\n",
-							(ulong)data, load_start);
+					printf ("   Trying '%s' FDT blob subimage\n",
+							fit_uname_fdt);
 
-					memmove ((void *)load_start,
-							(void *)data, size);
+					if (!fit_check_fdt (fit_hdr, fdt_noffset,
+								images->verify))
+						goto error;
 
-					fdt_blob = (char *)load_start;
-				} else {
-					fdt_blob = (char *)data;
-				}
+					/* get ramdisk image data address and length */
+					if (fit_image_get_data (fit_hdr, fdt_noffset,
+								&data, &size)) {
+						fdt_error ("Could not find FDT subimage data");
+						goto error;
+					}
 
-				images->fit_hdr_fdt = fit_hdr;
-				images->fit_uname_fdt = fit_uname_fdt;
-				images->fit_noffset_fdt = fdt_noffset;
-				break;
-			} else
+					/* verift that image data is a proper FDT blob */
+					if (fdt_check_header ((char *)data) != 0) {
+						fdt_error ("Subimage data is not a FTD");
+						goto error;
+					}
+
+					/*
+					 * move image data to the load address,
+					 * make sure we don't overwrite initial image
+					 */
+					image_start = (ulong)fit_hdr;
+					image_end = fit_get_end (fit_hdr);
+
+					if (fit_image_get_load (fit_hdr, fdt_noffset,
+								&load_start) == 0) {
+						load_end = load_start + size;
+
+						if ((load_start < image_end) &&
+								(load_end > image_start)) {
+							fdt_error ("FDT overwritten");
+							goto error;
+						}
+
+						printf ("   Loading FDT from 0x%08lx to 0x%08lx\n",
+								(ulong)data, load_start);
+
+						memmove ((void *)load_start,
+								(void *)data, size);
+
+						fdt_blob = (char *)load_start;
+					} else {
+						fdt_blob = (char *)data;
+					}
+
+					images->fit_hdr_fdt = fit_hdr;
+					images->fit_uname_fdt = fit_uname_fdt;
+					images->fit_noffset_fdt = fdt_noffset;
+					break;
+				} else
 #endif
-			{
-				/*
-				 * FDT blob
-				 */
-				fdt_blob = (char *)fdt_addr;
-				debug ("*  fdt: raw FDT blob\n");
-				printf ("## Flattened Device Tree blob at %08lx\n", (long)fdt_blob);
-			}
-			break;
-		default:
-			puts ("ERROR: Did not find a cmdline Flattened Device Tree\n");
-			goto error;
+				{
+					/*
+					 * FDT blob
+					 */
+					fdt_blob = (char *)fdt_addr;
+					debug ("*  fdt: raw FDT blob\n");
+					printf ("## Flattened Device Tree blob at %08lx\n", (long)fdt_blob);
+				}
+				break;
+			default:
+				puts ("ERROR: Did not find a cmdline Flattened Device Tree\n");
+				goto error;
 		}
 
 		printf ("   Booting using the fdt blob at 0x%x\n", (int)fdt_blob);
@@ -1534,8 +1415,8 @@ int boot_get_fdt (int flag, int argc, char *argv[], bootm_headers_t *images,
 		 * get second entry data start address and len.
 		 */
 		printf ("## Flattened Device Tree from multi "
-			"component Image at %08lX\n",
-			(ulong)images->legacy_hdr_os);
+				"component Image at %08lX\n",
+				(ulong)images->legacy_hdr_os);
 
 		image_multi_getimg (images->legacy_hdr_os, 2, &fdt_data, &fdt_len);
 		if (fdt_len) {
@@ -1593,13 +1474,13 @@ error:
  *     -1 - failure
  */
 int boot_get_cmdline (struct lmb *lmb, ulong *cmd_start, ulong *cmd_end,
-			ulong bootmap_base)
+		ulong bootmap_base)
 {
 	char *cmdline;
 	char *s;
 
 	cmdline = (char *)(ulong)lmb_alloc_base(lmb, CFG_BARGSIZE, 0xf,
-					 CFG_BOOTMAPSZ + bootmap_base);
+			CFG_BOOTMAPSZ + bootmap_base);
 
 	if (cmdline == NULL)
 		return -1;
@@ -1635,7 +1516,7 @@ int boot_get_cmdline (struct lmb *lmb, ulong *cmd_start, ulong *cmd_end,
 int boot_get_kbd (struct lmb *lmb, bd_t **kbd, ulong bootmap_base)
 {
 	*kbd = (bd_t *)(ulong)lmb_alloc_base(lmb, sizeof(bd_t), 0xf,
-				      CFG_BOOTMAPSZ + bootmap_base);
+			CFG_BOOTMAPSZ + bootmap_base);
 	if (*kbd == NULL)
 		return -1;
 
@@ -1735,10 +1616,10 @@ static void fit_get_debug (const void *fit, int noffset,
 		char *prop_name, int err)
 {
 	debug ("Can't get '%s' property from FIT 0x%08lx, "
-		"node: offset %d, name %s (%s)\n",
-		prop_name, (ulong)fit, noffset,
-		fit_get_name (fit, noffset, NULL),
-		fdt_strerror (err));
+			"node: offset %d, name %s (%s)\n",
+			prop_name, (ulong)fit, noffset,
+			fit_get_name (fit, noffset, NULL),
+			fdt_strerror (err));
 }
 
 /**
@@ -1795,14 +1676,14 @@ void fit_print_contents (const void *fit)
 	images_noffset = fdt_path_offset (fit, FIT_IMAGES_PATH);
 	if (images_noffset < 0) {
 		printf ("Can't find images parent node '%s' (%s)\n",
-			FIT_IMAGES_PATH, fdt_strerror (images_noffset));
+				FIT_IMAGES_PATH, fdt_strerror (images_noffset));
 		return;
 	}
 
 	/* Process its subnodes, print out component images details */
 	for (ndepth = 0, count = 0, noffset = fdt_next_node (fit, images_noffset, &ndepth);
-	     (noffset >= 0) && (ndepth > 0);
-	     noffset = fdt_next_node (fit, noffset, &ndepth)) {
+			(noffset >= 0) && (ndepth > 0);
+			noffset = fdt_next_node (fit, noffset, &ndepth)) {
 		if (ndepth == 1) {
 			/*
 			 * Direct child node of the images parent node,
@@ -1819,7 +1700,7 @@ void fit_print_contents (const void *fit)
 	confs_noffset = fdt_path_offset (fit, FIT_CONFS_PATH);
 	if (confs_noffset < 0) {
 		debug ("Can't get configurations parent node '%s' (%s)\n",
-			FIT_CONFS_PATH, fdt_strerror (confs_noffset));
+				FIT_CONFS_PATH, fdt_strerror (confs_noffset));
 		return;
 	}
 
@@ -1830,8 +1711,8 @@ void fit_print_contents (const void *fit)
 
 	/* Process its subnodes, print out configurations details */
 	for (ndepth = 0, count = 0, noffset = fdt_next_node (fit, confs_noffset, &ndepth);
-	     (noffset >= 0) && (ndepth > 0);
-	     noffset = fdt_next_node (fit, noffset, &ndepth)) {
+			(noffset >= 0) && (ndepth > 0);
+			noffset = fdt_next_node (fit, noffset, &ndepth)) {
 		if (ndepth == 1) {
 			/*
 			 * Direct child node of the configurations parent node,
@@ -1900,8 +1781,8 @@ void fit_image_print (const void *fit, int image_noffset, const char *p)
 
 	/* Remaining, type dependent properties */
 	if ((type == IH_TYPE_KERNEL) || (type == IH_TYPE_STANDALONE) ||
-	    (type == IH_TYPE_RAMDISK) || (type == IH_TYPE_FIRMWARE) ||
-	    (type == IH_TYPE_FLATDT)) {
+			(type == IH_TYPE_RAMDISK) || (type == IH_TYPE_FIRMWARE) ||
+			(type == IH_TYPE_FLATDT)) {
 		fit_image_get_arch (fit, image_noffset, &arch);
 		printf ("%s  Architecture: %s\n", p, genimg_get_arch_name (arch));
 	}
@@ -1929,8 +1810,8 @@ void fit_image_print (const void *fit, int image_noffset, const char *p)
 
 	/* Process all hash subnodes of the component image node */
 	for (ndepth = 0, noffset = fdt_next_node (fit, image_noffset, &ndepth);
-	     (noffset >= 0) && (ndepth > 0);
-	     noffset = fdt_next_node (fit, noffset, &ndepth)) {
+			(noffset >= 0) && (ndepth > 0);
+			noffset = fdt_next_node (fit, noffset, &ndepth)) {
 		if (ndepth == 1) {
 			/* Direct child node of the component image node */
 			fit_image_print_hash (fit, noffset, p);
@@ -1962,8 +1843,8 @@ void fit_image_print_hash (const void *fit, int noffset, const char *p)
 	 * names, e.g. hash@1, hash@2, etc.
 	 */
 	if (strncmp (fit_get_name(fit, noffset, NULL),
-			FIT_HASH_NODENAME,
-			strlen(FIT_HASH_NODENAME)) != 0)
+				FIT_HASH_NODENAME,
+				strlen(FIT_HASH_NODENAME)) != 0)
 		return;
 
 	debug ("%s  Hash node:    '%s'\n", p,
@@ -1977,7 +1858,7 @@ void fit_image_print_hash (const void *fit, int noffset, const char *p)
 	printf ("%s\n", algo);
 
 	ret = fit_image_hash_get_value (fit, noffset, &value,
-					&value_len);
+			&value_len);
 	printf ("%s  Hash value:   ", p);
 	if (ret) {
 		printf ("unavailable\n");
@@ -2070,14 +1951,14 @@ int fit_image_get_node (const void *fit, const char *image_uname)
 	images_noffset = fdt_path_offset (fit, FIT_IMAGES_PATH);
 	if (images_noffset < 0) {
 		debug ("Can't find images parent node '%s' (%s)\n",
-			FIT_IMAGES_PATH, fdt_strerror (images_noffset));
+				FIT_IMAGES_PATH, fdt_strerror (images_noffset));
 		return images_noffset;
 	}
 
 	noffset = fdt_subnode_offset (fit, images_noffset, image_uname);
 	if (noffset < 0) {
 		debug ("Can't get node offset for image unit name: '%s' (%s)\n",
-			image_uname, fdt_strerror (noffset));
+				image_uname, fdt_strerror (noffset));
 	}
 
 	return noffset;
@@ -2340,7 +2221,7 @@ int fit_image_hash_get_algo (const void *fit, int noffset, char **algo)
  *     -1, on failure
  */
 int fit_image_hash_get_value (const void *fit, int noffset, uint8_t **value,
-				int *value_len)
+		int *value_len)
 {
 	int len;
 
@@ -2375,11 +2256,11 @@ int fit_set_timestamp (void *fit, int noffset, time_t timestamp)
 
 	t = cpu_to_uimage (timestamp);
 	ret = fdt_setprop (fit, noffset, FIT_TIMESTAMP_PROP, &t,
-				sizeof (uint32_t));
+			sizeof (uint32_t));
 	if (ret) {
 		printf ("Can't set '%s' property for '%s' node (%s)\n",
-			FIT_TIMESTAMP_PROP, fit_get_name (fit, noffset, NULL),
-			fdt_strerror (ret));
+				FIT_TIMESTAMP_PROP, fit_get_name (fit, noffset, NULL),
+				fdt_strerror (ret));
 		return -1;
 	}
 
@@ -2404,11 +2285,11 @@ int fit_set_timestamp (void *fit, int noffset, time_t timestamp)
  *    -1, when algo is unsupported
  */
 static int calculate_hash (const void *data, int data_len, const char *algo,
-			uint8_t *value, int *value_len)
+		uint8_t *value, int *value_len)
 {
 	if (strcmp (algo, "crc32") == 0 ) {
 		*((uint32_t *)value) = crc32_wd (0, data, data_len,
-							CHUNKSZ_CRC32);
+				CHUNKSZ_CRC32);
 		*((uint32_t *)value) = cpu_to_uimage (*((uint32_t *)value));
 		*value_len = 4;
 	} else if (strcmp (algo, "sha1") == 0 ) {
@@ -2449,14 +2330,14 @@ int fit_set_hashes (void *fit)
 	images_noffset = fdt_path_offset (fit, FIT_IMAGES_PATH);
 	if (images_noffset < 0) {
 		printf ("Can't find images parent node '%s' (%s)\n",
-			FIT_IMAGES_PATH, fdt_strerror (images_noffset));
+				FIT_IMAGES_PATH, fdt_strerror (images_noffset));
 		return images_noffset;
 	}
 
 	/* Process its subnodes, print out component images details */
 	for (ndepth = 0, noffset = fdt_next_node (fit, images_noffset, &ndepth);
-	     (noffset >= 0) && (ndepth > 0);
-	     noffset = fdt_next_node (fit, noffset, &ndepth)) {
+			(noffset >= 0) && (ndepth > 0);
+			noffset = fdt_next_node (fit, noffset, &ndepth)) {
 		if (ndepth == 1) {
 			/*
 			 * Direct child node of the images parent node,
@@ -2518,8 +2399,8 @@ int fit_image_set_hashes (void *fit, int image_noffset)
 
 	/* Process all hash subnodes of the component image node */
 	for (ndepth = 0, noffset = fdt_next_node (fit, image_noffset, &ndepth);
-	     (noffset >= 0) && (ndepth > 0);
-	     noffset = fdt_next_node (fit, noffset, &ndepth)) {
+			(noffset >= 0) && (ndepth > 0);
+			noffset = fdt_next_node (fit, noffset, &ndepth)) {
 		if (ndepth == 1) {
 			/* Direct child node of the component image node */
 
@@ -2537,26 +2418,26 @@ int fit_image_set_hashes (void *fit, int image_noffset)
 
 			if (fit_image_hash_get_algo (fit, noffset, &algo)) {
 				printf ("Can't get hash algo property for "
-					"'%s' hash node in '%s' image node\n",
-					fit_get_name (fit, noffset, NULL),
-					fit_get_name (fit, image_noffset, NULL));
+						"'%s' hash node in '%s' image node\n",
+						fit_get_name (fit, noffset, NULL),
+						fit_get_name (fit, image_noffset, NULL));
 				return -1;
 			}
 
 			if (calculate_hash (data, size, algo, value, &value_len)) {
 				printf ("Unsupported hash algorithm (%s) for "
-					"'%s' hash node in '%s' image node\n",
-					algo, fit_get_name (fit, noffset, NULL),
-					fit_get_name (fit, image_noffset, NULL));
+						"'%s' hash node in '%s' image node\n",
+						algo, fit_get_name (fit, noffset, NULL),
+						fit_get_name (fit, image_noffset, NULL));
 				return -1;
 			}
 
 			if (fit_image_hash_set_value (fit, noffset, value,
-							value_len)) {
+						value_len)) {
 				printf ("Can't set hash value for "
-					"'%s' hash node in '%s' image node\n",
-					fit_get_name (fit, noffset, NULL),
-					fit_get_name (fit, image_noffset, NULL));
+						"'%s' hash node in '%s' image node\n",
+						fit_get_name (fit, noffset, NULL),
+						fit_get_name (fit, image_noffset, NULL));
 				return -1;
 			}
 		}
@@ -2580,15 +2461,15 @@ int fit_image_set_hashes (void *fit, int image_noffset)
  *     -1, on failure
  */
 int fit_image_hash_set_value (void *fit, int noffset, uint8_t *value,
-				int value_len)
+		int value_len)
 {
 	int ret;
 
 	ret = fdt_setprop (fit, noffset, FIT_VALUE_PROP, value, value_len);
 	if (ret) {
 		printf ("Can't set hash '%s' property for '%s' node (%s)\n",
-			FIT_VALUE_PROP, fit_get_name (fit, noffset, NULL),
-			fdt_strerror (ret));
+				FIT_VALUE_PROP, fit_get_name (fit, noffset, NULL),
+				fdt_strerror (ret));
 		return -1;
 	}
 
@@ -2630,8 +2511,8 @@ int fit_image_check_hashes (const void *fit, int image_noffset)
 
 	/* Process all hash subnodes of the component image node */
 	for (ndepth = 0, noffset = fdt_next_node (fit, image_noffset, &ndepth);
-	     (noffset >= 0) && (ndepth > 0);
-	     noffset = fdt_next_node (fit, noffset, &ndepth)) {
+			(noffset >= 0) && (ndepth > 0);
+			noffset = fdt_next_node (fit, noffset, &ndepth)) {
 		if (ndepth == 1) {
 			/* Direct child node of the component image node */
 
@@ -2641,21 +2522,21 @@ int fit_image_check_hashes (const void *fit, int image_noffset)
 			 * names, e.g. hash@1, hash@2, etc.
 			 */
 			if (strncmp (fit_get_name(fit, noffset, NULL),
-					FIT_HASH_NODENAME,
-					strlen(FIT_HASH_NODENAME)) != 0)
+						FIT_HASH_NODENAME,
+						strlen(FIT_HASH_NODENAME)) != 0)
 				continue;
 
 			if (fit_image_hash_get_algo (fit, noffset, &algo)) {
 				err_msg = " error!\nCan't get hash algo "
-						"property";
+					"property";
 				goto error;
 			}
 			printf ("%s", algo);
 
 			if (fit_image_hash_get_value (fit, noffset, &fit_value,
-							&fit_value_len)) {
+						&fit_value_len)) {
 				err_msg = " error!\nCan't get hash value "
-						"property";
+					"property";
 				goto error;
 			}
 
@@ -2706,17 +2587,17 @@ int fit_all_image_check_hashes (const void *fit)
 	images_noffset = fdt_path_offset (fit, FIT_IMAGES_PATH);
 	if (images_noffset < 0) {
 		printf ("Can't find images parent node '%s' (%s)\n",
-			FIT_IMAGES_PATH, fdt_strerror (images_noffset));
+				FIT_IMAGES_PATH, fdt_strerror (images_noffset));
 		return 0;
 	}
 
 	/* Process all image subnodes, check hashes for each */
 	printf ("## Checking hash(es) for FIT Image at %08lx ...\n",
-		(ulong)fit);
+			(ulong)fit);
 	for (ndepth = 0, count = 0,
-		noffset = fdt_next_node (fit, images_noffset, &ndepth);
-		(noffset >= 0) && (ndepth > 0);
-		noffset = fdt_next_node (fit, noffset, &ndepth)) {
+			noffset = fdt_next_node (fit, images_noffset, &ndepth);
+			(noffset >= 0) && (ndepth > 0);
+			noffset = fdt_next_node (fit, noffset, &ndepth)) {
 		if (ndepth == 1) {
 			/*
 			 * Direct child node of the images parent node,
@@ -2883,7 +2764,7 @@ int fit_conf_get_node (const void *fit, const char *conf_uname)
 	confs_noffset = fdt_path_offset (fit, FIT_CONFS_PATH);
 	if (confs_noffset < 0) {
 		debug ("Can't find configurations parent node '%s' (%s)\n",
-			FIT_CONFS_PATH, fdt_strerror (confs_noffset));
+				FIT_CONFS_PATH, fdt_strerror (confs_noffset));
 		return confs_noffset;
 	}
 
@@ -2901,7 +2782,7 @@ int fit_conf_get_node (const void *fit, const char *conf_uname)
 	noffset = fdt_subnode_offset (fit, confs_noffset, conf_uname);
 	if (noffset < 0) {
 		debug ("Can't get node offset for configuration unit name: '%s' (%s)\n",
-			conf_uname, fdt_strerror (noffset));
+				conf_uname, fdt_strerror (noffset));
 	}
 
 	return noffset;
@@ -3052,8 +2933,8 @@ static int fit_check_ramdisk (const void *fit, int rd_noffset, uint8_t arch, int
 
 	show_boot_progress (126);
 	if (!fit_image_check_os (fit, rd_noffset, IH_OS_LINUX) ||
-	    !fit_image_check_arch (fit, rd_noffset, arch) ||
-	    !fit_image_check_type (fit, rd_noffset, IH_TYPE_RAMDISK)) {
+			!fit_image_check_arch (fit, rd_noffset, arch) ||
+			!fit_image_check_type (fit, rd_noffset, IH_TYPE_RAMDISK)) {
 		printf ("No Linux %s Ramdisk Image\n",
 				genimg_get_arch_name(arch));
 		show_boot_progress (-126);

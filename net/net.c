@@ -252,6 +252,11 @@ void ArpRequest (void)
 
 	NetWriteIP ((uchar *) & arp->ar_data[16], NetArpWaitReplyIP);
 	(void) eth_send (NetTxPacket, (pkt - NetTxPacket) + ARP_HDR_SIZE);
+
+#ifdef ET_DEBUG
+	printf("eth_send complete length \n");
+#endif
+
 }
 
 void ArpTimeoutCheck(void)
@@ -325,6 +330,7 @@ NetLoop(proto_t protocol)
 #endif
 	if (eth_init(bd) < 0) {
 		eth_halt();
+		printf("ethernet init fail \n");
 		return(-1);
 	}
 
@@ -493,7 +499,8 @@ restart:
 	 *	Main packet reception loop.  Loop receiving packets until
 	 *	someone sets `NetState' to a state that terminates.
 	 */
-	for (;;) {
+	for (;;) 
+	{
 		WATCHDOG_RESET();
 #ifdef CONFIG_SHOW_ACTIVITY
 		{
@@ -545,7 +552,11 @@ restart:
 		}
 
 
-		switch (NetState) {
+#ifdef ET_DEBUG
+	printf("NetState  = %d \n",NetState);
+#endif
+		switch (NetState) 
+		{
 
 		case NETLOOP_RESTART:
 #ifdef CONFIG_NET_MULTI
@@ -722,7 +733,7 @@ int PingSend(void)
 	memcpy(mac, NetEtherNullAddr, 6);
 
 #ifdef ET_DEBUG
-	printf("sending ARP for %08lx\n", NetPingIP);
+	printf("PingSend sending ARP for %08lx\n", NetPingIP);
 #endif
 
 	NetArpWaitPacketIP = NetPingIP;
@@ -788,7 +799,7 @@ PingHandler (uchar * pkt, unsigned dest, unsigned src, unsigned len)
 static void PingStart(void)
 {
 #if defined(CONFIG_NET_MULTI)
-	printf ("Using %s device\n", eth_get_name());
+	printf ("PingStart Using %s device\n", eth_get_name());
 #endif	/* CONFIG_NET_MULTI */
 	NetSetTimeout (10UL * CFG_HZ, PingTimeout);
 	NetSetHandler (PingHandler);

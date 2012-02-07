@@ -36,5 +36,10 @@
 #define CONFIG_CMD_RUN		/* run command in env variable	*/
 #define CONFIG_CMD_SETGETDCR	/* DCR support on 4xx		*/
 #define CONFIG_CMD_XIMG		/* Load part of Multi Image	*/
+/*
+ * shlee added 08 11 25
+ */
+
+#define CONFIG_CMD_DEFENV		/* default environment make */
 
 #endif	/* _CONFIG_CMD_DEFAULT_H */

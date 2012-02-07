@@ -28,8 +28,12 @@
 /* #define	DEBUG	*/
 
 #include <common.h>
-#include <watchdog.h>
 #include <command.h>
+#include <watchdog.h>
+#include <asm/arch/at91sam9260.h>
+#include <asm/arch/at91_watchdog.h>
+#include <asm/arch/io.h>
+#include <net.h>
 #ifdef CONFIG_MODEM_SUPPORT
 #include <malloc.h>		/* for free() prototype */
 #endif
@@ -210,6 +214,7 @@ static int menukey = 0;
 static __inline__ int abortboot(int bootdelay)
 {
 	int abort = 0;
+	int inputkey = 0;
 
 #ifdef CONFIG_MENUPROMPT
 	printf(CONFIG_MENUPROMPT);
@@ -231,26 +236,79 @@ static __inline__ int abortboot(int bootdelay)
 	}
 #endif
 
-	while ((bootdelay > 0) && (!abort)) {
+	while ((bootdelay > 0) && (!abort)) 
+	{
 		int i;
 
 		--bootdelay;
-		/* delay 100 * 10ms */
-		for (i=0; !abort && i<100; ++i) {
-			if (tstc()) {	/* we got a key press	*/
-				abort  = 1;	/* don't auto boot	*/
-				bootdelay = 0;	/* no more delay	*/
+
+/*
+ * shlee change this for fast booting 
+ */
+		
+		/* delay 10 * 10ms */
+		for (i=0; !abort && i<10; ++i) 
+		{
+			if (tstc()) 
+			{	/* we got a key press	*/
+				/* 2009 aug 21 
+				 * Lee soon ho
+				 * only enter key(0xd) can be accepted when enter the bootloader terminal
+				 */
 # ifdef CONFIG_MENUKEY
 				menukey = getc();
 # else
-				(void) getc();  /* consume input	*/
+				inputkey = getc();
+				if(inputkey == 13)
+				{
+					udelay (100000);
+					if (tstc()) 
+					{
+						inputkey = getc();
+						if(inputkey != 13)
+						{
+							printf("\n noise detect, booting kernel \n");
+						}
+						else
+						{
+							//-->shlee_8513 disable watchdog timer in bootloader 
+							at91_sys_write(AT91C_WDTC_WDMR, AT91C_WDTC_WDDIS);
+							abort  = 1;	/* don't auto boot	*/
+							bootdelay = 0;	/* no more delay	*/
+						}
+					}
+					else
+					{
+						//-->shlee_8513 disable watchdog timer in bootloader 
+						at91_sys_write(AT91C_WDTC_WDMR, AT91C_WDTC_WDDIS);
+						abort  = 1;	/* don't auto boot	*/
+						bootdelay = 0;	/* no more delay	*/
+					}
+					break;
+				}
+				else // if(inputkey != 13)
+				{
+					printf(" detect %d,please input enter key to access bootloader\n",inputkey); 
+				}
 # endif
+/*
+ * shlee changed this for watchdog disable when entering bootloader
+ */
+
 				break;
 			}
 			udelay(10000);
 		}
 
 		printf("\b\b\b%2d ", bootdelay);
+	}
+
+/*
+ * shlee changed this for watchdog timer reset
+ */
+	if(abort != 1)
+	{
+		at91_sys_write(AT91C_WDTC_WDCR, (AT91C_WDTC_WDRSTT | AT91C_WDTC_KEY));
 	}
 
 	putc('\n');
@@ -401,6 +459,18 @@ void main_loop (void)
 		disable_ctrlc(prev);	/* restore Control C checking */
 # endif
 	}
+
+#if defined(CONFIG_CMD_NET)
+#if defined(CONFIG_NET_MULTI)
+	puts ("Net:   ");
+#endif
+	eth_initialize(gd->bd);
+#if defined(CONFIG_RESET_PHY_R)
+	debug ("Reset Ethernet PHY\n");
+	reset_phy();
+#endif
+#endif
+
 
 # ifdef CONFIG_MENUKEY
 	if (menukey == CONFIG_MENUKEY) {
